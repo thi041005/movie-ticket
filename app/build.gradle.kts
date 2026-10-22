@@ -49,6 +49,7 @@ android {
 dependencies {
 
     implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.material3)
 
     // Core AndroidX libraries
     implementation(libs.androidx.core.ktx.v1120)

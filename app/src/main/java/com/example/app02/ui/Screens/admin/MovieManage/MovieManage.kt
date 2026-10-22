@@ -1,66 +1,42 @@
 package com.example.app02.ui.Screens.admin.MovieManage
 
-import android.app.DatePickerDialog
 import android.net.Uri
 import android.widget.CalendarView
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.ExposedDropdownMenuBox
-import androidx.compose.material.ExposedDropdownMenuDefaults
-import androidx.compose.material.IconButton
-import androidx.compose.material.Text
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,17 +55,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.app02.R
-import com.example.app02.nav.Screen
-import com.example.app02.network.api.MovieSearch
-import com.example.app02.network.models.Cate
-import com.example.app02.network.models.Genre
-import com.example.app02.network.models.Movie
+import com.example.app02.models.Cate
+import com.example.app02.models.Genre
+import com.example.app02.models.Movie
+import com.example.app02.models.DialogData
 import com.example.app02.ui.Screens.user.LoadingIndicator
-import com.example.app02.ui.Screens.user.MovieShowtimes
 import com.example.app02.ui.components.BoldTextComponent
 import com.example.app02.ui.components.Btn
-import com.example.app02.ui.components.CommonHeader
 import com.example.app02.ui.components.CommonScaffold
+import com.example.app02.ui.components.CommonAlertDialog
 import com.example.app02.ui.components.CustomTabRow
 import com.example.app02.ui.components.CustomizableSearchBar
 import com.example.app02.ui.components.LightTextComponent
@@ -101,13 +75,8 @@ import com.example.app02.ui.theme.boxshadow
 import com.example.app02.viewmodel.CateViewModel
 import com.example.app02.viewmodel.LoginViewModel
 import com.example.app02.viewmodel.MovieViewModel
-import com.kizitonwose.calendar.compose.VerticalCalendar
-import com.kizitonwose.calendar.compose.rememberCalendarState
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
-import java.util.Calendar
 
 @Composable
 fun MovieManageScreen(
@@ -115,17 +84,50 @@ fun MovieManageScreen(
     navController: NavController,
     movieViewModel: MovieViewModel = viewModel(),
     cateViewModel: CateViewModel = viewModel(),
-
-    ) {
+) {
     val isLogged by loginViewModel.isLogged.collectAsState(initial = false)
-    val movies by movieViewModel.movies.collectAsState()
+    val uiState by movieViewModel.uiState.collectAsState()
     val cates = cateViewModel.cate.value
+    var dialogData by remember { mutableStateOf<DialogData?>(null) }
     var selectedTabIndex by rememberSaveable { mutableStateOf(0) }
     val tabTitles = listOf("Danh sách phim", "Thêm phim")
+
     LaunchedEffect(Unit) {
         movieViewModel.fetchMovies()
         cateViewModel.fetchCate()
     }
+
+    // Lắng nghe thông báo từ ViewModel
+    LaunchedEffect(uiState.userMessage, uiState.errorMessage) {
+        uiState.userMessage?.let { msg ->
+            dialogData = DialogData(
+                title = "Thao tác thành công",
+                message = msg,
+                dismissText = null,
+                icon = Icons.Default.CheckCircle,
+                onConfirm = { dialogData = null },
+                onDismiss = { dialogData = null }
+            )
+            movieViewModel.userMessageShown()
+            if (msg.contains("Thêm phim", ignoreCase = true)) {
+                selectedTabIndex = 0 // Tự động quay về tab danh sách khi thêm thành công
+            }
+        }
+        uiState.errorMessage?.let { error ->
+            dialogData = DialogData(
+                title = "Không thể hoàn tất thao tác",
+                message = error,
+                dismissText = null,
+                icon = Icons.Default.ErrorOutline,
+                onConfirm = { dialogData = null },
+                onDismiss = { dialogData = null }
+            )
+            movieViewModel.userMessageShown()
+        }
+    }
+
+    dialogData?.let { CommonAlertDialog(it) }
+
     CommonScaffold(isLogged, navController, loginViewModel, "admin") { p ->
         Column(
             modifier = Modifier
@@ -140,16 +142,23 @@ fun MovieManageScreen(
 
             when (selectedTabIndex) {
                 0 -> {
-                    if (movies == null) {
+                    if (uiState.isLoading && uiState.movies.isEmpty()) {
                         LoadingIndicator()
                     } else {
-                        MovieList(cates, movies, navController, movieViewModel)
+                        MovieList(
+                            cates = cates,
+                            movies = uiState.movies,
+                            navController = navController,
+                            movieViewModel = movieViewModel
+                        )
                     }
                 }
 
-                1 -> NewMovieScreen(cates, navController, movieViewModel)
+                1 -> NewMovieScreen(
+                    cates = cates,
+                    movieViewModel = movieViewModel
+                )
             }
-//
         }
     }
 }
@@ -161,154 +170,128 @@ fun MovieList(
     navController: NavController,
     movieViewModel: MovieViewModel,
 ) {
-    var query by remember { mutableStateOf("") }
-    val result by movieViewModel.movies.collectAsState()
-    LaunchedEffect(query) {
-        if (query.isNotBlank()) {
-            movieViewModel.search(query)
-        }
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-    ) {
-        cates.forEach { cate ->
-            Card(
-                modifier = Modifier
-                    .weight(1f) // chia đều
-                    .height(50.dp)
-                    .padding(8.dp)
-                    .clickable { movieViewModel.fetchMoviesByCate(cate.id) }
-                    .customShadow(
-                        color = boxshad,
-                        alpha = 0.2f,
-                        borderRadius = 16.dp,
-                        shadowRadius = 10.dp,
-                        offsetX = 4.dp,
-                        offsetY = 4.dp
-                    ),
-                shape = RoundedCornerShape(12.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White.copy(alpha = 0.1f) // màu nền trắng mờ
-                )
+    val searchQuery by movieViewModel.searchQuery.collectAsState()
 
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = cate.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.LightGray
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Hàng chọn thể loại (thay weight bằng width để tránh crash khi cuộn ngang)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 4.dp)
+        ) {
+            cates.forEach { cate ->
+                Card(
+                    modifier = Modifier
+                        .width(130.dp)
+                        .height(50.dp)
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                        .clickable { movieViewModel.fetchMoviesByCate(cate.id) }
+                        .customShadow(
+                            color = boxshad,
+                            alpha = 0.2f,
+                            borderRadius = 16.dp,
+                            shadowRadius = 10.dp,
+                            offsetX = 4.dp,
+                            offsetY = 4.dp
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.1f)
                     )
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = cate.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.LightGray
+                        )
+                    }
                 }
             }
         }
-    }
-//    val dummyMovieList = listOf(
-//        MovieSearch(
-//            id = 1,
-//            title = "Địa đạo",
-//            poster = "https://media.baovanhoa.vn/zoom/1000/uploaded/nguyenthithutrang/2024_04_29/dia_dao_FHSP.jpg",
-//            cast = "Đông Thi"
-//        ),
-//        MovieSearch(
-//            id = 2,
-//            title = "Bố già",
-//            cast = "Đông Thi",
-//            poster = "https://link-to-another-image.jpg",
-//        )
-//    )
 
+        CustomizableSearchBar(
+            query = searchQuery,
+            onQueryChange = { movieViewModel.onSearchQueryChanged(it) },
+            onSearch = { /* Đã được ViewModel tự debounce */ },
+            searchResults = movies,
+            onResultClick = { id ->
+                navController.navigate("movie/$id")
+            }
+        )
 
-    CustomizableSearchBar(
-        query = query,
-        onQueryChange = {
-            query = it
-            movieViewModel.search(it)
-        },
-        onSearch = { /* no-op */ },
-        searchResults = result,
-        onResultClick = {id ->
-            navController.navigate("movie/${id}")
-             println("Clicked movie ID: $id") }
-    )
-    LazyColumn {
-        items(movies) { movie ->
-            Box( //2
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(bcl)
-                    .customShadow(
-                        color = boxshadow,
-                        alpha = 0.2f,
-                        borderRadius = 16.dp,
-                        shadowRadius = 10.dp,
-                        offsetX = 2.dp,
-                        offsetY = 2.dp
-                    )
-                    .clip(RoundedCornerShape(16.dp))
-                    .padding(8.dp)
-                    .clickable {
-                        navController.navigate("movie/${movie.id}")
-                    }
-            )
-            {
-                Card(
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(movies) { movie ->
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(100.dp)
-//                    .clickable { movieViewModel.fetchMoviesByCate(cate.id) }
-                    ,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = boxshadow
-                    )
-
-                ) {
-                    Row {
-                        Box(modifier = Modifier.weight(1f)) {
-                            val painter = rememberAsyncImagePainter(
-                                model = if (movie.poster.startsWith("content://")) Uri.parse(movie.poster) else movie.poster
-                            )
-
-                            Image(
-                                painter = painter,
-                                contentDescription = "Movie Poster",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .size(400.dp)
-                                    .padding(8.dp)
-                            )
-
-
+                        .background(bcl)
+                        .customShadow(
+                            color = boxshadow,
+                            alpha = 0.2f,
+                            borderRadius = 16.dp,
+                            shadowRadius = 10.dp,
+                            offsetX = 2.dp,
+                            offsetY = 2.dp
+                        )
+                        .clip(RoundedCornerShape(16.dp))
+                        .padding(8.dp)
+                        .clickable {
+                            navController.navigate("movie/${movie.id}")
                         }
-                        Box(modifier = Modifier.weight(3f)) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(4.dp),
-                                horizontalAlignment = Alignment.Start,
-                            ) {
-                                Text(
-                                    movie.title,
-                                    style = TextStyle(
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color.LightGray
-                                    )
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = boxshadow)
+                    ) {
+                        Row {
+                            Box(modifier = Modifier.weight(1f)) {
+                                val posterModel = if (movie.poster.startsWith("content://")) {
+                                    Uri.parse(movie.poster)
+                                } else {
+                                    movie.poster
+                                }
+
+                                Image(
+                                    painter = rememberAsyncImagePainter(model = posterModel),
+                                    contentDescription = "Movie Poster",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(8.dp)
                                 )
-                                Spacer(modifier = Modifier.padding(4.dp))
-                                LightTextComponent(movie.title)
+                            }
+                            Box(modifier = Modifier.weight(3f)) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(4.dp),
+                                    horizontalAlignment = Alignment.Start,
+                                ) {
+                                    Text(
+                                        text = movie.title,
+                                        style = TextStyle(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color.LightGray
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LightTextComponent(movie.title)
+                                }
                             }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
             }
-            Spacer(modifier = Modifier.padding(8.dp))
         }
     }
 }
@@ -316,9 +299,10 @@ fun MovieList(
 @Composable
 fun NewMovieScreen(
     cates: List<Cate>,
-    navController: NavController,
     movieViewModel: MovieViewModel
 ) {
+    val uiState by movieViewModel.uiState.collectAsState()
+
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var duration by remember { mutableStateOf("") }
@@ -331,23 +315,24 @@ fun NewMovieScreen(
     var endDate by remember { mutableStateOf<LocalDate?>(null) }
     var start by remember { mutableStateOf("") }
     var end by remember { mutableStateOf("") }
-    var selectedCate by remember { mutableStateOf<Cate>(Cate(1, "Đang chiếu")) }
-    var selectedGenre by remember { mutableStateOf<Genre>(Genre(1, "Hành động")) }
-    val context = LocalContext.current
+
+    var selectedCate by remember(cates) {
+        mutableStateOf(cates.firstOrNull() ?: Cate(1, "Đang chiếu"))
+    }
     val genres = listOf(
         Genre(1, "Hành động"),
-        Genre(2, "Kinh dị "),
+        Genre(2, "Kinh dị"),
         Genre(3, "Hài hước"),
-        Genre(3, "Tình cảm"),
-        Genre(3, "Gia đình")
+        Genre(4, "Tình cảm"),
+        Genre(5, "Gia đình")
     )
+    var selectedGenre by remember { mutableStateOf(genres.first()) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         posterUri = uri
     }
-
 
     LazyColumn(
         modifier = Modifier
@@ -356,7 +341,7 @@ fun NewMovieScreen(
     ) {
         item {
             MyTextField(
-                "Tên phim",
+                labelValue = "Tên phim",
                 leadingIconVector = Icons.Default.VideoLibrary,
                 value = title,
                 onValueChange = { title = it }
@@ -365,7 +350,7 @@ fun NewMovieScreen(
 
         item {
             MyTextField(
-                "Mô tả",
+                labelValue = "Mô tả",
                 leadingIconVector = Icons.Default.Description,
                 value = description,
                 onValueChange = { description = it }
@@ -374,7 +359,7 @@ fun NewMovieScreen(
 
         item {
             OutlinedTextField(
-                value = duration ?: "",
+                value = duration,
                 onValueChange = { input ->
                     if (input.all { it.isDigit() }) {
                         duration = input
@@ -394,31 +379,38 @@ fun NewMovieScreen(
                     unfocusedContainerColor = bcl,
                     focusedIndicatorColor = Color.White,
                     unfocusedIndicatorColor = Color.White,
+                    focusedPlaceholderColor = Color.White,
                     unfocusedPlaceholderColor = Color.White,
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White
                 )
-
-
             )
-
         }
 
         item {
-            Text("Poster phim",  style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start=8.dp, bottom = 4.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)).background(Color.Gray.copy(alpha = 0.2f)).clickable {
-                launcher.launch("image/*")
-            },
-                contentAlignment = Alignment.Center){
-                if (posterUri != null){
+            Text(
+                "Poster phim",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Gray.copy(alpha = 0.2f))
+                    .clickable { launcher.launch("image/*") },
+                contentAlignment = Alignment.Center
+            ) {
+                if (posterUri != null) {
                     Image(
                         painter = rememberAsyncImagePainter(posterUri),
                         contentDescription = "poster",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                }else{
-                    Text("Cham de chon", color = Color.Gray)
+                } else {
+                    Text("Chạm để chọn ảnh", color = Color.Gray)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -426,7 +418,7 @@ fun NewMovieScreen(
 
         item {
             MyTextField(
-                "Diễn viên",
+                labelValue = "Diễn viên",
                 leadingIconVector = Icons.Default.Person,
                 value = cast,
                 onValueChange = { cast = it }
@@ -435,20 +427,22 @@ fun NewMovieScreen(
 
         item {
             MyTextField(
-                "Đạo diễn",
+                labelValue = "Đạo diễn",
                 leadingIconVector = Icons.Default.PersonOutline,
                 value = director,
                 onValueChange = { director = it }
             )
         }
+
         item {
             MyTextField(
-                "Trailer",
+                labelValue = "Trailer",
                 leadingIconVector = Icons.Default.PersonOutline,
                 value = trailer,
                 onValueChange = { trailer = it }
             )
         }
+
         item {
             Text(
                 text = "Ngày bắt đầu",
@@ -465,13 +459,11 @@ fun NewMovieScreen(
                     factory = { CalendarView(it) },
                     modifier = Modifier.fillMaxSize(),
                     update = { calendarView ->
-                        // Cập nhật ngày đã chọn nếu có
                         startDate?.let {
                             val millis =
                                 it.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                             calendarView.date = millis
                         }
-                        // Lắng nghe khi người dùng chọn ngày
                         calendarView.setOnDateChangeListener { _, year, month, dayOfMonth ->
                             startDate = LocalDate.of(year, month + 1, dayOfMonth)
                             start = startDate.toString()
@@ -490,7 +482,7 @@ fun NewMovieScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp) // ✅ chiều cao cố định
+                    .height(300.dp)
                     .padding(bottom = 16.dp)
             ) {
                 AndroidView(
@@ -532,43 +524,37 @@ fun NewMovieScreen(
                 icon = Icons.Default.Movie
             )
         }
+
         item {
-            Btn("Thêm", onClick = {
-                val movie = Movie(
-                    title = title,
-                    des = description,
-                    genre = selectedGenre,
-                    duration = duration.toInt(),
-                    poster = posterUri.toString() ?: "",
-                    cast = cast,
-                    avg = 0.0,
-                    director = director,
-                    startDate = start,
-                    endDate = end,
-                    category = selectedCate,
-                    trailer = trailer
-                )
-                movieViewModel.newMovie(movie) { success ->
-                    if (success) {
-                        Toast.makeText(context, "Thêm phim thành công", Toast.LENGTH_SHORT).show()
-                        movieViewModel.fetchMovies()
-                        navController.popBackStack()
-
-                    }
-                    else
-                    { Toast.makeText(context, "Thêm phim thất bại", Toast.LENGTH_SHORT).show() }
-
+            Spacer(modifier = Modifier.height(16.dp))
+            if (uiState.isLoading) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
-            })
-
+            } else {
+                Btn("Thêm", onClick = {
+                    val movie = Movie(
+                        title = title,
+                        des = description,
+                        genre = selectedGenre,
+                        duration = duration.toIntOrNull() ?: 0,
+                        poster = posterUri?.toString() ?: "",
+                        cast = cast,
+                        avg = 0.0,
+                        director = director,
+                        startDate = start,
+                        endDate = end,
+                        category = selectedCate,
+                        trailer = trailer
+                    )
+                    movieViewModel.createMovie(movie)
+                })
+            }
         }
     }
-
-
 }
 
-
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun <T> LabeledDropdown(
     label: String,
@@ -591,7 +577,7 @@ fun <T> LabeledDropdown(
             label = { Text(label) },
             leadingIcon = { Icon(icon, contentDescription = null) },
             trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -614,10 +600,9 @@ fun <T> LabeledDropdown(
     }
 }
 
-
 @Composable
 @Preview
-fun previewMovieList() {
+fun PreviewMovieList() {
     Column {
         Box(
             modifier = Modifier
@@ -632,34 +617,24 @@ fun previewMovieList() {
                     offsetY = 4.dp
                 )
                 .clip(RoundedCornerShape(5.dp))
-                .padding(8.dp) // Thêm padding để tạo khoảng cách giữa bóng đổ và nội dung
-        )
-        {
+                .padding(8.dp)
+        ) {
             Card(
                 modifier = Modifier
                     .height(100.dp)
-                    .fillMaxSize()
-//                    .clickable { movieViewModel.fetchMoviesByCate(cate.id) }
-                ,
+                    .fillMaxSize(),
                 shape = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = boxshadow
-                )
-
+                colors = CardDefaults.cardColors(containerColor = boxshadow)
             ) {
                 Row {
                     Box(modifier = Modifier.weight(1f)) {
-
                         Image(
                             painter = painterResource(id = R.drawable.batman),
                             contentDescription = "Movie Poster",
-                            contentScale = ContentScale.Fit, // hoặc ContentScale.FillWidth nếu muốn nó lấp đầy theo chiều ngang
-                            modifier = Modifier
-                                .fillMaxSize() // Hoặc .fillMaxSize() nếu muốn chiếm toàn bộ không gian cha
-                                .size(400.dp) // Có thể điều chỉnh chiều cao theo nhu cầu
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
                         )
-
                     }
                     Box(modifier = Modifier.weight(3f)) {
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -670,6 +645,5 @@ fun previewMovieList() {
             }
         }
         Spacer(modifier = Modifier.padding(8.dp))
-
     }
 }

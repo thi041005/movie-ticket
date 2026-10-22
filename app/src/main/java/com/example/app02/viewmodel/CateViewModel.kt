@@ -4,7 +4,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app02.network.api.RetrofitInstance
-import com.example.app02.network.models.Cate
+import com.example.app02.models.Cate
 import kotlinx.coroutines.launch
 
 class CateViewModel: ViewModel(){

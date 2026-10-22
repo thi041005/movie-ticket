@@ -28,10 +28,10 @@ private val LightColorScheme = lightColorScheme(
     secondary = headerColor,
     tertiary = bcl,
 
-    background = Color(0xFF1A2232), // Đặt nền cho chế độ sáng
-    surface = Color(0xFF202B40),
+    background = bcl,
+    surface = bcl,
 
-    onBackground = Color.White, // Màu chữ trên nền sáng
+    onBackground = Color.White,
     onSurface = Color.White
 )
 

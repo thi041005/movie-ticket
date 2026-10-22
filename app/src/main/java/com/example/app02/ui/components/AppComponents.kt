@@ -22,9 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
@@ -35,12 +32,10 @@ import androidx.compose.material.DropdownMenu
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Login
@@ -51,39 +46,43 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -100,19 +99,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.isTraversalGroup
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
@@ -123,22 +116,57 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.example.app02.nav.Screen
-import com.example.app02.network.api.MovieSearch
-import com.example.app02.network.models.Movie
+import com.example.app02.models.Movie
+import com.example.app02.models.DialogData
 import com.example.app02.ui.theme.GradientBtn
 import com.example.app02.ui.theme.boxshadow
 import com.example.app02.ui.theme.headerColor
 
 import com.example.app02.ui.theme.textFocus
-import com.example.app02.ui.theme.ticket
 import com.example.app02.viewmodel.CateViewModel
-import com.example.app02.viewmodel.LoginState
 import com.example.app02.viewmodel.LoginViewModel
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+
+@Composable
+fun BackOnlyTopBar(
+    navController: NavController,
+    title: String? = null
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(56.dp)
+            .padding(WindowInsets.statusBars.asPaddingValues())
+            .background(color = headerColor)
+    ) {
+        IconButton(
+            onClick = { navController.popBackStack() },
+            modifier = Modifier.align(Alignment.CenterStart)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "back",
+                tint = Color.White
+            )
+        }
+
+        title?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.align(Alignment.Center),
+                color = Color.White
+            )
+        }
+    }
+}
 
 @Composable
 fun CommonHeader(
@@ -183,16 +211,8 @@ fun CommonHeader(
     }
 }
 
-
-//@Preview
-//@Composable
-//fun DefaultPreviewOfHeader() {
-//    Btn("Preview", onClick = {})
-//}
-
 @Composable
 fun NormalTextComponent(value: String, textAlign: TextAlign = TextAlign.Center) {
-
     Text(
         text = value,
         style = TextStyle(
@@ -321,7 +341,11 @@ fun Modifier.customShadow(
 }
 
 @Composable
-fun LightTextComponent(value: String, color: Color? = null, alignment: TextAlign ?= TextAlign.Start) {
+fun LightTextComponent(
+    value: String,
+    color: Color? = null,
+    alignment: TextAlign? = TextAlign.Start
+) {
     Box(
     ) {
         Text(
@@ -666,6 +690,8 @@ fun CommonScaffold(
     navController: NavController,
     loginViewModel: LoginViewModel,
     role: String,
+    showTopBar: Boolean = true,
+    showBackButton: Boolean = false,
     cateViewModel: CateViewModel = viewModel(),
     content: @Composable (PaddingValues) -> Unit
 ) {
@@ -690,23 +716,24 @@ fun CommonScaffold(
                         }
                 )
                 Spacer(modifier = Modifier.padding(16.dp))
-                if (role == "admin"){
-                Text(
-                    "Quản lý phim", modifier = Modifier
-                        .padding(16.dp)
-                        .clickable {
-                            navController.navigate(Screen.MovieManage.route)
-                            expanded = false
-                        }
-                )
-                Text(
-                    "Quản lý suất chiếu", modifier = Modifier
-                        .padding(16.dp)
-                        .clickable {
-                            navController.navigate(Screen.Showtime.route)
-                            expanded = false
-                        }
-                )}
+                if (role == "admin") {
+                    Text(
+                        "Quản lý phim", modifier = Modifier
+                            .padding(16.dp)
+                            .clickable {
+                                navController.navigate(Screen.MovieManage.route)
+                                expanded = false
+                            }
+                    )
+                    Text(
+                        "Quản lý suất chiếu", modifier = Modifier
+                            .padding(16.dp)
+                            .clickable {
+                                navController.navigate(Screen.Showtime.route)
+                                expanded = false
+                            }
+                    )
+                }
                 Box(modifier = Modifier) {
 
                     DropdownMenu(
@@ -730,63 +757,71 @@ fun CommonScaffold(
     ) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.logo),
-                                contentDescription = "Logo",
+                if (showTopBar) {
+                    TopAppBar(
+                        title = {
+                            Row(
                                 modifier = Modifier
-                                    .size(50.dp)
-                                    .clip(CircleShape)
-                                    .border(2.dp, Color.Transparent, CircleShape)
-                            )
-
-                            IconButton(
-                                onClick = {
-                                    navController.navigate(Screen.Bill.route)
-                                }
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = "Profile",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(32.dp)
+                                Image(
+                                    painter = painterResource(id = R.drawable.logo),
+                                    contentDescription = "Logo",
+                                    modifier = Modifier
+                                        .size(50.dp)
+                                        .clip(CircleShape)
+                                        .border(2.dp, Color.Transparent, CircleShape)
                                 )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        when (role) {
-                            "admin" -> {
-                                IconButton(onClick = {
-                                    scope.launch {
-                                        drawerState.open()
+
+                                IconButton(
+                                    onClick = {
+                                        navController.navigate(Screen.Bill.route)
                                     }
-                                }) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Menu")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "Profile",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(32.dp)
+                                    )
                                 }
                             }
+                        },
+                        navigationIcon = {
+                            when {
+                                showBackButton -> {
+                                    IconButton(onClick = { navController.popBackStack() }) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowBack,
+                                            contentDescription = "Back",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
 
-                            "user" -> {
-                                Spacer(modifier = Modifier.width(0.dp)) // Không hiển thị gì
-                            }
+                                role == "admin" -> {
+                                    IconButton(onClick = {
+                                        scope.launch {
+                                            drawerState.open()
+                                        }
+                                    }) {
+                                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+                                    }
+                                }
 
-                            else -> {
-                                Spacer(modifier = Modifier.width(0.dp)) // fallback
+                                else -> {
+                                    Spacer(modifier = Modifier.width(0.dp))
+                                }
                             }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = headerColor
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = headerColor
+                        )
+
                     )
-
-                )
+                }
             },
             bottomBar = {
                 BottomAppBar(
@@ -804,7 +839,7 @@ fun CommonScaffold(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { navController.navigate(Screen.Home.route) },
+                                        .clickable { navController.navigate(Screen.UserHome.route) },
                                     contentAlignment = Alignment.Center,
 
                                     ) {
@@ -853,13 +888,14 @@ fun CommonScaffold(
                                                 navController.navigate(Screen.Login.route)
                                             } else {
                                                 loginViewModel.logout() { success ->
-                                                    navController.navigate(Screen.Login.route) {
-                                                        popUpTo(Screen.Login.route) {
-                                                            inclusive = true
+                                                    if (success) {
+                                                        navController.navigate(Screen.Login.route) {
+                                                            popUpTo(navController.graph.id) {
+                                                                inclusive = true
+                                                            }
+                                                            launchSingleTop = true
                                                         }
-                                                        launchSingleTop = true
                                                     }
-
                                                 }
                                             }
                                         }, contentAlignment = Alignment.Center
@@ -880,24 +916,30 @@ fun CommonScaffold(
 
                             "admin" -> {
 
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        modifier = Modifier
-                                            .size(35.dp)
-                                            .fillMaxSize(),
-                                        imageVector = Icons.Default.Home,
-                                        contentDescription = "home",
-                                        tint = Color.Gray
-                                    )
-                                }
+
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { }, contentAlignment = Alignment.Center
+                                        .fillMaxHeight()
+                                        .clickable {
+                                            navController.navigate("admin_home") {
+                                                launchSingleTop = true
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        modifier = Modifier.size(35.dp),
+                                        imageVector = Icons.Default.Home,
+                                        contentDescription = "Home",
+                                        tint = Color.Gray
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {}, contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.DateRange,
@@ -925,6 +967,7 @@ fun CommonScaffold(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
+                                        .fillMaxHeight()
                                         .clickable {
                                             if (!isLogged) {
                                                 navController.navigate(Screen.Login.route)
@@ -938,19 +981,18 @@ fun CommonScaffold(
                                                     }
 
                                                 }
-//                    navController.navigate(Screen.Bill.route)
                                             }
-                                        }, contentAlignment = Alignment.Center
+                                        },
+                                    contentAlignment = Alignment.Center
                                 ) {
 
                                     Icon(
                                         imageVector = if (!isLogged) Icons.Default.Login else Icons.Default.Logout,
                                         contentDescription = if (!isLogged) "Login" else "logout",
                                         tint = Color.Gray,
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .fillMaxSize()
-                                    )
+                                        modifier = Modifier.size(35.dp),
+
+                                        )
 
                                 }
                             }
@@ -964,10 +1006,114 @@ fun CommonScaffold(
     }
 }
 
-@Composable
-fun Ticket() {
-    val loginViewModel: LoginViewModel = viewModel()
 
+@Composable
+fun ScheduleTimeSettings(
+    fromDate: LocalDate,
+    toDate: LocalDate,
+    dailyStart: LocalTime,
+    dailyEnd: LocalTime,
+    onDateRangeClick: () -> Unit,
+    onStartTimeClick: () -> Unit,
+    onEndTimeClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF1A1A1A)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ScheduleSettingRow(
+                label = "Từ ngày",
+                value = fromDate.format(
+                    DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                ),
+                icon = Icons.Default.CalendarToday,
+                onClick = onDateRangeClick
+            )
+
+            ScheduleSettingRow(
+                label = "Đến ngày",
+                value = toDate.format(
+                    DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                ),
+                icon = Icons.Default.CalendarToday,
+                onClick = onDateRangeClick
+            )
+
+            ScheduleSettingRow(
+                label = "Bắt đầu",
+                value = dailyStart.format(
+                    DateTimeFormatter.ofPattern("HH:mm")
+                ),
+                icon = Icons.Default.AccessTime,
+                onClick = onStartTimeClick
+            )
+
+            ScheduleSettingRow(
+                label = "Kết thúc",
+                value = dailyEnd.format(
+                    DateTimeFormatter.ofPattern("HH:mm")
+                ),
+                icon = Icons.Default.AccessTime,
+                onClick = onEndTimeClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScheduleSettingRow(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = Color(0xFFBDBDBD)
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = value,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+
+            IconButton(
+                onClick = onClick,
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        Color(0xFF2A2A2A),
+                        RoundedCornerShape(10.dp)
+                    )
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = "Chỉnh sửa $label",
+                    tint = Color(0xFFFFD54F),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1015,35 +1161,187 @@ fun CustomizableSearchBar(
 
 }
 
-//@Preview(showBackground = true)
-//@Composable
-//fun CustomizableSearchBarPreview() {
-////    val dummyMovieList = listOf(
-////        MovieSearch(
-////            id = 1,
-////            title = "Địa đạo",
-////            poster = "https://media.baovanhoa.vn/zoom/1000/uploaded/nguyenthithutrang/2024_04_29/dia_dao_FHSP.jpg",
-////            cast = "Đông Thi"
-////        ),
-////        MovieSearch(
-////            id = 2,
-////            title = "Bố già",
-////            cast = "Đông Thi",
-////            poster = "https://link-to-another-image.jpg",
-////        )
-////    )
-//
-//    var query by remember { mutableStateOf("") }
-//
-//    CustomizableSearchBar(
-//        query = query,
-//        onQueryChange = { query = it },
-//        onSearch = { /* no-op */ },
-//        searchResults = ,
-//        onResultClick = { id -> println("Clicked movie ID: $id") }
-//    )
-//}
-//
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DateRangePickerModal(
+    onDateRangeSelected: (Pair<Long?, Long?>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val dateRangePickerState = rememberDateRangePickerState()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            tonalElevation = 0.dp,
+            color = Color(0xFF121212),
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Chọn phạm vi ngày",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                DateRangePicker(
+                    state = dateRangePickerState,
+                    title = null,
+                    showModeToggle = false,
+                    colors = DatePickerDefaults.colors(
+                        containerColor = Color(0xFF121212),
+                        titleContentColor = Color.White,
+                        headlineContentColor = Color.White,
+                        weekdayContentColor = Color(0xFFBDBDBD),
+                        navigationContentColor = Color.White,
+                        dayContentColor = Color.White,
+                        selectedDayContainerColor = Color(0xFFFFD54F),
+                        selectedDayContentColor = Color(0xFF111111),
+                        todayContentColor = Color(0xFFFFD54F),
+                        todayDateBorderColor = Color(0xFFFFD54F),
+                        dayInSelectionRangeContainerColor = Color(0x66FFD54F),
+                        dayInSelectionRangeContentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(480.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = { onDismiss() }
+                    ) {
+                        Text(
+                            text = "Hủy",
+                            color = Color(0xFFBDBDBD)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            onDateRangeSelected(
+                                Pair(
+                                    dateRangePickerState.selectedStartDateMillis,
+                                    dateRangePickerState.selectedEndDateMillis
+                                )
+                            )
+                            onDismiss()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFFD54F),
+                            contentColor = Color(0xFF111111)
+                        )
+                    ) {
+                        Text("Xác nhận", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DialExample(
+    initialTime: LocalTime = LocalTime.now(),
+    onConfirm: (LocalTime) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialTime.hour,
+        initialMinute = initialTime.minute,
+        is24Hour = true,
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            tonalElevation = 0.dp,
+            color = Color(0xFF121212),
+            modifier = Modifier.padding(12.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Chọn giờ",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                TimePicker(
+                    state = timePickerState,
+                    colors = TimePickerDefaults.colors(
+                        clockDialColor = Color(0xFF1F1F1F),
+                        clockDialSelectedContentColor = Color(0xFF111111),
+                        clockDialUnselectedContentColor = Color.White,
+                        selectorColor = Color(0xFFFFD54F),
+                        containerColor = Color(0xFF121212),
+                        periodSelectorBorderColor = Color(0xFF2A2A2A),
+                        periodSelectorSelectedContainerColor = Color(0xFFFFD54F),
+                        periodSelectorSelectedContentColor = Color(0xFF111111),
+                        periodSelectorUnselectedContentColor = Color.White,
+                        timeSelectorSelectedContainerColor = Color(0xFFFFD54F),
+                        timeSelectorSelectedContentColor = Color(0xFF111111),
+                        timeSelectorUnselectedContainerColor = Color(0xFF1F1F1F),
+                        timeSelectorUnselectedContentColor = Color.White
+                    )
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = { onDismiss() }
+                    ) {
+                        Text(
+                            text = "Hủy",
+                            color = Color(0xFFBDBDBD)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val selectedTime = LocalTime.of(
+                                timePickerState.hour,
+                                timePickerState.minute
+                            )
+                            onConfirm(selectedTime)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFFD54F),
+                            contentColor = Color(0xFF111111)
+                        )
+                    ) {
+                        Text("Xác nhận", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 @Preview
 @Composable
@@ -1130,4 +1428,103 @@ fun previewTicket() {
     }
     Spacer(modifier = Modifier.padding(8.dp))
 
+}
+
+@Composable
+fun CommonAlertDialog(
+    title: String,
+    message: String,
+    confirmText: String = "Xác nhận",
+    dismissText: String? = "Hủy",
+    icon: ImageVector? = null,
+    isDestructive: Boolean = false, // Nút confirm đổi sang màu đỏ khi xóa
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val accentColor = if (isDestructive) Color(0xFFFF6B6B) else Color(0xFFFFD54F)
+    val dialogColor = Color(0xFF202020)
+    val secondaryTextColor = Color(0xFFBDBDBD)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(24.dp),
+        containerColor = dialogColor,
+        icon = {
+            if (icon != null) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp),
+                        tint = accentColor
+                    )
+                }
+            }
+        },
+        title = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = secondaryTextColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.textButtonColors(
+                    containerColor = accentColor,
+                    contentColor = if (isDestructive) Color.White else Color(0xFF111111)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(confirmText, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            if (dismissText != null) {
+                TextButton(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = secondaryTextColor
+                    )
+                ) {
+                    Text(dismissText)
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun CommonAlertDialog(dialogData: DialogData) {
+    CommonAlertDialog(
+        title = dialogData.title,
+        message = dialogData.message,
+        confirmText = dialogData.confirmText,
+        dismissText = dialogData.dismissText,
+        icon = dialogData.icon,
+        isDestructive = dialogData.isDestructive,
+        onConfirm = dialogData.onConfirm,
+        onDismiss = dialogData.onDismiss
+    )
 }

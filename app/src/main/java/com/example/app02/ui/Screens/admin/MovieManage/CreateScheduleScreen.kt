@@ -1,8 +1,16 @@
 package com.example.app02.ui.Screens.admin.MovieManage
 
-import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material3.Card
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -13,18 +21,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.app02.network.models.Movie
-import com.example.app02.ui.components.BoldTextComponent
 import com.example.app02.ui.components.Btn
-import com.example.app02.ui.components.CommonHeader
+import com.example.app02.ui.components.CommonAlertDialog
 import com.example.app02.ui.components.CommonScaffold
 import com.example.app02.ui.components.LightTextComponentCenter
 import com.example.app02.ui.components.RowComponent
 import com.example.app02.viewmodel.LoginViewModel
 import com.example.app02.viewmodel.MovieViewModel
 import com.example.app02.viewmodel.ShowtimeViewModel
+import com.example.app02.models.DialogData
+import com.example.app02.ui.components.DateRangePickerModal
+import com.example.app02.ui.components.DialExample
+import com.example.app02.ui.components.ScheduleTimeSettings
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -40,7 +51,9 @@ fun CreateScheduleScreen(
     movieViewModel: MovieViewModel = viewModel()
 ) {
 
-    val movie by movieViewModel.selectedMovie.collectAsState()
+    val movieUiState by movieViewModel.uiState.collectAsState()
+    val movie = movieUiState.selectedMovie
+
     var fromDate by remember { mutableStateOf(LocalDate.now()) }
     var toDate by remember { mutableStateOf(LocalDate.now().plusDays(2)) }
     var dailyStart by remember { mutableStateOf(LocalTime.of(9, 0)) }
@@ -49,48 +62,75 @@ fun CreateScheduleScreen(
     val isLogged by loginViewModel.isLogged.collectAsState(initial = false)
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    var note by remember { mutableStateOf("") }
-    LaunchedEffect(Unit) {
+    var dialogData by remember { mutableStateOf<DialogData?>(null) }
+
+    LaunchedEffect(movieId) {
         movieViewModel.fetchMovieDetails(movieId)
     }
-    CommonScaffold(isLogged, navController, loginViewModel, "admin") { p ->
-        Column(modifier = Modifier.padding(p)) {
-            BoldTextComponent("Tạo lịch chiếu")
-            RowComponent("Từ ngày: ", fromDate.toString())
-            RowComponent("Đến ngày: ", toDate.toString())
-            Btn("Chọn ngày", onClick = {
-                showDatePicker = true
-            })
-            RowComponent(
-                "Giờ bắt đầu mỗi ngày: ",
-                dailyStart.format(DateTimeFormatter.ofPattern("HH:mm"))
-            )
-            Btn("Chọn giờ", onClick = { showStartTimePicker = true })
+    CommonScaffold(isLogged, navController, loginViewModel, "admin", showTopBar = false) { p ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(p)
+                .background(Color(0xFF111111))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            movie?.let {
+                com.example.app02.ui.components.BackOnlyTopBar(
+                    navController,
+                    title = it.title
+                )
 
-            RowComponent(
-                "Giờ kết thúc mỗi ngày: ",
-                dailyEnd.format(DateTimeFormatter.ofPattern("HH:mm"))
+            }
+
+            ScheduleTimeSettings(
+                fromDate = fromDate,
+                toDate = toDate,
+                dailyStart = dailyStart,
+                dailyEnd = dailyEnd,
+                onDateRangeClick = {
+                    showDatePicker = true
+                },
+                onStartTimeClick = {
+                    showStartTimePicker = true
+                },
+                onEndTimeClick = {
+                    showEndTimePicker = true
+                }
             )
-            Btn("Chọn giờ", onClick = { showEndTimePicker = true })
 
             Btn("Lập lịch", onClick = {
-
                 movie?.id?.let {
-                    scheduleViewModel.scheduleByMovie(it,fromDate, toDate, dailyStart, dailyEnd) { success ->
+                    scheduleViewModel.scheduleByMovie(
+                        it,
+                        fromDate,
+                        toDate,
+                        dailyStart,
+                        dailyEnd
+                    ) { success ->
                         if (success) {
-
-                            Toast.makeText(context, "Lập lịch thành công", Toast.LENGTH_SHORT).show()
-                            note = "Lên lịch thành công, vui lòng kiểm tra lại!"
+                            dialogData = DialogData(
+                                title = "Lập lịch thành công",
+                                message = "Các suất chiếu đã được tạo. Vui lòng kiểm tra lại lịch trước khi công bố.",
+                                dismissText = null,
+                                icon = Icons.Default.CheckCircle,
+                                onConfirm = { dialogData = null },
+                                onDismiss = { dialogData = null }
+                            )
                         } else {
-                            Toast.makeText(context, "Lập lịch that bai", Toast.LENGTH_SHORT).show()
-                            note = "Lên lịch that bai, vui lòng kiểm tra lại!"
+                            dialogData = DialogData(
+                                title = "Không thể lập lịch",
+                                message = "Không thể tạo suất chiếu lúc này. Vui lòng kiểm tra khoảng thời gian và thử lại.",
+                                dismissText = null,
+                                icon = Icons.Default.ErrorOutline,
+                                onConfirm = { dialogData = null },
+                                onDismiss = { dialogData = null }
+                            )
                         }
                     }
                 }
             })
-
-            LightTextComponentCenter(note, Color.Green)
 
             if (showDatePicker) {
                 DateRangePickerModal(
@@ -111,7 +151,8 @@ fun CreateScheduleScreen(
             }
 
             if (showStartTimePicker) {
-                DialExample(initialTime = dailyStart,
+                DialExample(
+                    initialTime = dailyStart,
                     onConfirm = {
                         dailyStart = it
                         showStartTimePicker = false
@@ -119,7 +160,8 @@ fun CreateScheduleScreen(
                     onDismiss = { showStartTimePicker = false })
             }
             if (showEndTimePicker) {
-                DialExample(initialTime = dailyEnd,
+                DialExample(
+                    initialTime = dailyEnd,
                     onConfirm = {
                         dailyEnd = it
                         showEndTimePicker = false
@@ -128,4 +170,5 @@ fun CreateScheduleScreen(
             }
         }
     }
+    dialogData?.let { CommonAlertDialog(it) }
 }

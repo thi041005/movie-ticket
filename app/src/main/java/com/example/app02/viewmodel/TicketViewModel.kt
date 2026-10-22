@@ -8,47 +8,101 @@ import androidx.lifecycle.viewModelScope
 import com.example.app02.data.DataStore
 import com.example.app02.network.api.RetrofitInstance
 import com.example.app02.network.api.TicketDTO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class TicketViewModel(application: Application) : AndroidViewModel(application) {
-    val dataStore = DataStore(application)
-    private val _ticket = MutableStateFlow<TicketDTO?>(null)
-    val ticket: StateFlow<TicketDTO?> = _ticket
 
-    private val _tickets = MutableStateFlow<List<TicketDTO>>(emptyList())
+    val dataStore = DataStore(application)
+
+    private val _ticketUiState =
+        MutableStateFlow<TicketUiState>(TicketUiState.Loading)
+
+    val ticketUiState = _ticketUiState.asStateFlow()
+
+    private val _tickets =
+        MutableStateFlow<List<TicketDTO>>(emptyList())
+
     val tickets = _tickets.asStateFlow()
 
+    private var getTicketJob: Job? = null
 
-    private val _loading = MutableStateFlow(false)
-    val loading: StateFlow<Boolean> = _loading
+    fun getTicket(
+        bookingId: Int,
+        maxAttempts: Int = 8,
+        retryDelayMs: Long = 1_000L
+    ) {
+        // Không để request cũ ghi đè kết quả của booking mới.
+        getTicketJob?.cancel()
 
+        getTicketJob = viewModelScope.launch {
+            _ticketUiState.value = TicketUiState.Loading
 
-    fun getTicket(bookingId: Int) {
-        viewModelScope.launch {
-            _loading.value = true
-            try {
+            repeat(maxAttempts) { attempt ->
+                try {
+                    val response =
+                        RetrofitInstance.apiService.getTicket(bookingId)
 
+                    if (response.isSuccessful) {
+                        val body = response.body()
 
-                val response = RetrofitInstance.apiService.getTicket(bookingId)
-                if (response.isSuccessful) {
-                    _ticket.value = response.body()
-                } else {
+                        if (body != null) {
+                            _ticketUiState.value =
+                                TicketUiState.Success(body)
+                            return@launch
+                        }
+
+                        // HTTP thành công nhưng body chưa có.
+                        Log.w(
+                            "TicketViewModel",
+                            "Booking $bookingId: response body rỗng"
+                        )
+                    } else {
+                        val code = response.code()
+
+                        Log.w(
+                            "TicketViewModel",
+                            "Booking $bookingId: HTTP $code"
+                        )
+
+                        // 404 có thể là vé chưa được tạo xong.
+                        // 5xx có thể là lỗi tạm thời từ server.
+                        if (code != 404 && code !in 500..599) {
+                            _ticketUiState.value = TicketUiState.Error(
+                                "Không thể tải vé (HTTP $code). " +
+                                        "Vui lòng thử lại."
+                            )
+                            return@launch
+                        }
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
                     Log.e(
                         "TicketViewModel",
-                        "API error: ${response.code()} - ${response.message()}"
+                        "Lỗi tải vé booking $bookingId",
+                        e
                     )
-                    _ticket.value = null
                 }
-            } catch (e: Exception) {
-                Log.e("TicketViewModel", "Network error", e)
-                _ticket.value = null
-            } finally {
-                _loading.value = false
+
+                // Chờ trước lần thử tiếp theo, trừ lần cuối.
+                if (attempt < maxAttempts - 1) {
+                    delay(retryDelayMs)
+                }
             }
+
+            // Sau 8 lần thử vẫn chưa có vé.
+            // Không khẳng định vé đã bị hủy vì chưa đủ bằng chứng.
+            _ticketUiState.value = TicketUiState.NotFound
         }
+    }
+
+    fun retryGetTicket(bookingId: Int) {
+        getTicket(bookingId)
     }
 
     fun getTicketsByUser(id:Int,onResult: (Boolean) -> Unit) {
@@ -69,4 +123,17 @@ class TicketViewModel(application: Application) : AndroidViewModel(application) 
 
         }
     }
+}
+sealed interface TicketUiState {
+    data object Loading : TicketUiState
+
+    data class Success(
+        val ticket: TicketDTO
+    ) : TicketUiState
+
+    data object NotFound : TicketUiState
+
+    data class Error(
+        val message: String
+    ) : TicketUiState
 }

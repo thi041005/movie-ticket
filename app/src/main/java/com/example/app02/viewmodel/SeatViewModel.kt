@@ -7,7 +7,8 @@ import com.example.app02.data.DataStore
 import com.example.app02.dto.HoldSeatReq
 import com.example.app02.network.api.AllSeatHeld
 import com.example.app02.network.api.RetrofitInstance
-import com.example.app02.network.models.Seat
+import com.example.app02.models.Seat
+import com.example.app02.network.api.NetworkConfig
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +20,6 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import okio.ByteString
 
 
 class SeatViewModel(application: Application) : AndroidViewModel(application) {
@@ -31,7 +31,7 @@ class SeatViewModel(application: Application) : AndroidViewModel(application) {
     fun initWebSocket(showtimeId: Int) {
         val client = OkHttpClient()
         val request = Request.Builder()
-            .url("ws://192.168.100.107:8080/ws/websocket")
+            .url(NetworkConfig.WS_URL)
             .build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {

@@ -2,20 +2,17 @@ package com.example.app02.viewmodel
 
 import android.app.Application
 import android.util.Log
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app02.data.DataStore
-import com.example.app02.network.api.ApiService
 import com.example.app02.network.api.BookingRequest
 import com.example.app02.network.api.BookingResponse
 import com.example.app02.network.api.CancelBookReq
 import com.example.app02.network.api.RetrofitInstance
-import com.example.app02.network.models.Seat
-import kotlinx.coroutines.delay
+import com.example.app02.models.Seat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -95,36 +92,52 @@ class BookingViewModel(application: Application) : AndroidViewModel(application)
     }
 
 
-    fun getBookingState(bookingId: Int, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val response = RetrofitInstance.apiService.getBookingState(bookingId)
-                if (response.isSuccessful) {
-                    _state.value = response.body() ?: 0
-                    onResult(true)
-                } else {
-                    _state.value = 0
-                    onResult(false)
+    suspend fun refreshBookingState(bookingId: Int): Int? {
+        return try {
+            val response =
+                RetrofitInstance.apiService.getBookingState(bookingId)
+
+            if (response.isSuccessful) {
+                response.body()?.also { bookingStatus ->
+                    _state.value = bookingStatus
                 }
-            } catch (e: Exception) {
-                _state.value = 0
-                onResult(false)
+            } else {
+                Log.e(
+                    "BookingViewModel",
+                    "Không thể kiểm tra booking: HTTP ${response.code()}"
+                )
+                null
             }
+        } catch (e: Exception) {
+            Log.e(
+                "BookingViewModel",
+                "Lỗi kiểm tra trạng thái booking $bookingId",
+                e
+            )
+            null
         }
     }
 
-    fun countSeat(showtimeId: Int){
+    fun getBookingState(bookingId: Int, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val status = refreshBookingState(bookingId)
+            onResult(status != null)
+        }
+    }
+
+    fun countSeat(showtimeId: Int) {
         viewModelScope.launch {
             try {
                 val response = RetrofitInstance.apiService.countSeat(showtimeId)
                 if (response.isSuccessful) {
                     _counted.value = response.body() ?: 0
                 }
-            }catch (e: Exception){
+            } catch (e: Exception) {
                 Log.e("dem ghe loi ", "${e}")
             }
         }
     }
+
 }
 
 

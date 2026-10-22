@@ -29,6 +29,7 @@ firebaseAuthKtx = "23.2.0"
 uiTestJunit4 = "1.7.8"
 firebaseDatabase="20.2.1"
 hilt = "2.48"
+material3 = "1.4.0"
 
 
 [libraries]
@@ -78,6 +79,7 @@ ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 
 firebase-database = { group = "com.google.firebase", name = "firebase-database", version.ref = "firebaseDatabase" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

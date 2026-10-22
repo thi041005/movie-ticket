@@ -1,6 +1,4 @@
-package com.example.app02.network.models
-
-import java.time.LocalDateTime
+package com.example.app02.models
 
 data class Showtime(
     val id: Int,

@@ -16,11 +16,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 
@@ -32,7 +29,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
@@ -55,18 +51,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
-import com.example.app02.network.models.Movie
-import com.example.app02.ui.components.CommonHeader
+import com.example.app02.models.Movie
 import com.example.app02.ui.components.CommonScaffold
 import com.example.app02.ui.components.CustomizableSearchBar
 import com.example.app02.ui.components.DemoBoldTextComponent
@@ -89,17 +78,17 @@ fun HomeScreen(
 
     ) {
     val isLogged by loginViewModel.isLogged.collectAsState(initial = false)
-    val movies by movieViewModel.movies.collectAsState()
     val cates = cateViewModel.cate.value
     var query by remember { mutableStateOf("") }
-    val result by movieViewModel.movies.collectAsState()
 
+    val uiState by movieViewModel.uiState.collectAsState()
+    val movies = uiState.movies
     CommonScaffold(isLogged, navController, loginViewModel, "user") { p ->
         LaunchedEffect(Unit) {
             movieViewModel.fetchMovies()
             cateViewModel.fetchCate()
             if (query.isNotBlank()) {
-                movieViewModel.search(query)
+                movieViewModel.onSearchQueryChanged(query)
             }
         }
         Surface(
@@ -153,10 +142,10 @@ fun HomeScreen(
                     query = query,
                     onQueryChange = {
                         query = it
-                        movieViewModel.search(it)
+                        movieViewModel.onSearchQueryChanged(it)
                     },
                     onSearch = { /* no-op */ },
-                    searchResults = result,
+                    searchResults = movies,
                     onResultClick = { id ->
                         navController.navigate("movie/${id}")
                         println("Clicked movie ID: $id")
@@ -173,7 +162,7 @@ fun HomeScreen(
                     item(span = { GridItemSpan(2) }) {
                         AutoSlidingCarousel(movies = movies, navController)
                     }
-                    items(movieViewModel.movies.value) { movie ->
+                    items(movies) { movie ->
                         MovieItem(movie, navController)
                     }
 

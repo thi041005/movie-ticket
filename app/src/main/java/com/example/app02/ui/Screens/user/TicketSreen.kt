@@ -19,32 +19,35 @@ import androidx.compose.material.Divider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.app02.R
-import com.example.app02.ui.components.CommonHeader
+import com.example.app02.ui.components.BackOnlyTopBar
 import com.example.app02.ui.components.CommonScaffold
-import com.example.app02.ui.components.LightTextComponent
+import com.example.app02.ui.components.CommonAlertDialog
+import com.example.app02.models.DialogData
 import com.example.app02.ui.components.LightTextComponentCenter
 import com.example.app02.ui.components.RowComponent2
-import com.example.app02.ui.components.Ticket
 import com.example.app02.ui.theme.bcl
 import com.example.app02.viewmodel.LoginViewModel
+import com.example.app02.viewmodel.TicketUiState
 import com.example.app02.viewmodel.TicketViewModel
 import java.time.format.DateTimeFormatter
-
 @Composable
 fun TicketScreen(
     navController: NavController,
@@ -52,90 +55,187 @@ fun TicketScreen(
     ticketViewModel: TicketViewModel,
     loginViewModel: LoginViewModel,
 ) {
-    val isLogged by loginViewModel.isLogged.collectAsState(initial = false)
-    val ticketState = ticketViewModel.ticket.collectAsState(initial = null)
-    val isLoading by ticketViewModel.loading.collectAsState()
-    val ticket = ticketState.value
+    val isLogged by loginViewModel.isLogged.collectAsState(
+        initial = false
+    )
 
-    // Gọi API lấy ticket khi composable được tạo
+    val ticketUiState by ticketViewModel.ticketUiState
+        .collectAsState()
+
+    var dialogData by remember(bookingId) {
+        mutableStateOf<DialogData?>(null)
+    }
+
     LaunchedEffect(bookingId) {
         ticketViewModel.getTicket(bookingId)
     }
 
-    CommonScaffold(isLogged, navController, loginViewModel, "user") { padding ->
+    LaunchedEffect(ticketUiState, bookingId) {
+        dialogData = when (val state = ticketUiState) {
+            is TicketUiState.Loading,
+            is TicketUiState.Success -> null
+
+            is TicketUiState.NotFound -> DialogData(
+                title = "Chưa lấy được thông tin vé",
+                message = "Hệ thống chưa lấy được thông tin vé. " +
+                        "Vui lòng thử tải lại.",
+                confirmText = "Tải lại",
+                dismissText = "Quay lại",
+                icon = Icons.Default.ErrorOutline,
+                onConfirm = {
+                    dialogData = null
+                    ticketViewModel.retryGetTicket(bookingId)
+                },
+                onDismiss = {
+                    dialogData = null
+                    navController.popBackStack()
+                }
+            )
+
+            is TicketUiState.Error -> DialogData(
+                title = "Không thể tải vé",
+                message = state.message,
+                confirmText = "Thử lại",
+                dismissText = "Quay lại",
+                icon = Icons.Default.ErrorOutline,
+                onConfirm = {
+                    dialogData = null
+                    ticketViewModel.retryGetTicket(bookingId)
+                },
+                onDismiss = {
+                    dialogData = null
+                    navController.popBackStack()
+                }
+            )
+        }
+    }
+
+    CommonScaffold(
+        isLogged,
+        navController,
+        loginViewModel,
+        "user",
+        showTopBar = false
+    ) { padding ->
+
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            when {
-                isLoading -> {
-                    CommonHeader(title = ticket?.movieName ?: "Thông tin vé", navController)
+            BackOnlyTopBar(
+                navController,
+                title = "Vé của tôi"
+            )
+
+            when (val state = ticketUiState) {
+                is TicketUiState.Loading -> {
+                    Spacer(modifier = Modifier.height(32.dp))
+
                     CircularProgressIndicator()
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Thanh toán thành công!",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Đang tạo và tải thông tin vé..."
+                    )
                 }
 
-                ticket == null -> {
-                    Text("Không tìm thấy thông tin vé", color = Color.Red)
+                is TicketUiState.NotFound,
+                is TicketUiState.Error -> {
+                    // Dialog được hiển thị bên ngoài CommonScaffold.
                 }
 
-                else -> {
-                    val seatText = ticket.seat.joinToString { "${it.row}${it.col}, " }
-                    CommonHeader("Thanh toán thành công", navController)
+                is TicketUiState.Success -> {
+                    val ticket = state.ticket
+
+                    val seatText = ticket.seat.joinToString(", ") {
+                        "${it.row}${it.col}"
+                    }
+
                     LazyColumn(
                         modifier = Modifier
+                            .fillMaxSize()
                             .padding(15.dp)
                             .background(bcl),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         item {
-                            LightTextComponentCenter("Không chia sẻ cho bất kỳ ai!")
+                            LightTextComponentCenter(
+                                "Không chia sẻ cho bất kỳ ai!"
+                            )
                         }
+
                         item {
-                            LightTextComponentCenter("Cung cấp mã QR này cho nhân viên tại quầy để xác nhận! ")
+                            LightTextComponentCenter(
+                                "Cung cấp mã QR này cho nhân viên tại quầy để xác nhận!"
+                            )
                         }
+
                         item {
                             Column(
                                 modifier = Modifier
+                                    .fillMaxWidth()
                                     .padding(15.dp)
                                     .background(bcl),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
+                                // QR vé
                                 Box(
                                     modifier = Modifier
                                         .clip(
                                             RoundedCornerShape(
-                                                topStart = 30.dp, topEnd = 30.dp
+                                                topStart = 30.dp,
+                                                topEnd = 30.dp
                                             )
                                         )
                                         .size(400.dp)
-                                        .background(com.example.app02.ui.theme.ticket)
+                                        .background(
+                                            com.example.app02.ui.theme.ticket
+                                        ),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    ticket.qr?.let {
+                                    if (!ticket.qr.isNullOrBlank()) {
                                         Image(
-                                            painter = rememberAsyncImagePainter(model = it),
-                                            contentDescription = "logo",
+                                            painter = rememberAsyncImagePainter(
+                                                model = ticket.qr
+                                            ),
+                                            contentDescription = "QR vé",
                                             contentScale = ContentScale.Fit,
-                                            modifier = Modifier
-                                                .fillMaxSize(0.7f)
-                                                .align(Alignment.Center)
+                                            modifier = Modifier.fillMaxSize(0.7f)
                                         )
+                                    } else {
+                                        Text("Vé chưa có mã QR")
                                     }
                                 }
 
+                                // Đường cắt vé
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(com.example.app02.ui.theme.ticket),
+                                        .background(
+                                            com.example.app02.ui.theme.ticket
+                                        ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(modifier = Modifier.fillMaxWidth(0.1f)) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(0.1f)
+                                    ) {
                                         Image(
-                                            painter = painterResource(id = R.drawable.noun_half_circle_left),
-                                            contentDescription = "left half circle",
-                                            contentScale = ContentScale.Fit,
-
-                                            )
+                                            painter = painterResource(
+                                                id = R.drawable.noun_half_circle_left
+                                            ),
+                                            contentDescription = "Nửa hình tròn bên trái",
+                                            contentScale = ContentScale.Fit
+                                        )
                                     }
 
                                     Row(
@@ -148,80 +248,87 @@ fun TicketScreen(
                                             Divider(
                                                 modifier = Modifier
                                                     .height(5.dp)
-                                                    .width(20.dp), color = bcl
+                                                    .width(20.dp),
+                                                color = bcl
                                             )
                                         }
                                     }
 
-                                    Box(modifier = Modifier.fillMaxWidth(0.1f)) {
-
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(0.1f)
+                                    ) {
                                         Image(
-                                            painter = painterResource(id = R.drawable.right),
-                                            contentDescription = "left half circle",
-                                            contentScale = ContentScale.Fit,
+                                            painter = painterResource(
+                                                id = R.drawable.right
+                                            ),
+                                            contentDescription = "Nửa hình tròn bên phải",
+                                            contentScale = ContentScale.Fit
                                         )
                                     }
                                 }
 
+                                // Thông tin vé
                                 Column(
                                     modifier = Modifier
                                         .clip(
                                             RoundedCornerShape(
-                                                bottomStart = 30.dp, bottomEnd = 30.dp
+                                                bottomStart = 30.dp,
+                                                bottomEnd = 30.dp
                                             )
                                         )
-                                        .background(com.example.app02.ui.theme.ticket)
-                                        .fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-
-                                    ) {
+                                        .fillMaxWidth()
+                                        .background(
+                                            com.example.app02.ui.theme.ticket
+                                        ),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
                                     RowComponent2(
-                                        " ",
-                                        ticket.payTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+                                        "Thời gian: ",
+                                        ticket.payTime.format(
+                                            DateTimeFormatter.ofPattern(
+                                                "dd/MM/yyyy HH:mm"
+                                            )
+                                        )
                                     )
-                                    Spacer(modifier = Modifier.padding(5.dp))
-                                    RowComponent2("Phim: ", ticket.movieName)
-                                    RowComponent2("Phòng chiếu: ", ticket.audName)
-                                    RowComponent2("Ghế: ", seatText)
-                                    RowComponent2("Đã thanh toán: ", "${ticket.total.toInt()} VND")
 
+                                    Spacer(
+                                        modifier = Modifier.height(5.dp)
+                                    )
+
+                                    RowComponent2(
+                                        "Phim: ",
+                                        ticket.movieName
+                                    )
+
+                                    RowComponent2(
+                                        "Phòng chiếu: ",
+                                        ticket.audName
+                                    )
+
+                                    RowComponent2(
+                                        "Ghế: ",
+                                        seatText
+                                    )
+
+                                    RowComponent2(
+                                        "Đã thanh toán: ",
+                                        "${ticket.total.toInt()} VND"
+                                    )
+
+                                    RowComponent2(
+                                        "Mã vé: ",
+                                        ticket.ticketId.toString()
+                                    )
                                 }
                             }
-                        }
-                    }
-                    ticket.qr?.let {
-                        Image(
-                            painter = rememberAsyncImagePainter(model = it),
-                            contentDescription = "QR ticket",
-                            modifier = Modifier
-                                .size(200.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(text = "Phòng chiếu: ${ticket.audName}")
-                    Text(text = "Mã vé: ${ticket.ticketId}")
-                    Text(
-                        text = "Thanh toán lúc: ${
-                            ticket.payTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
-                        }"
-                    )
-                    Text(text = "Tổng tiền: ${ticket.total} VNĐ")
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(text = "Chỗ ngồi:", style = MaterialTheme.typography.titleMedium)
-                    Row {
-                        ticket.seat.forEach {
-                            Text(
-                                text = "${it.row}${it.col}", modifier = Modifier.padding(4.dp)
-                            )
                         }
                     }
                 }
             }
         }
+    }
+
+    dialogData?.let {
+        CommonAlertDialog(it)
     }
 }

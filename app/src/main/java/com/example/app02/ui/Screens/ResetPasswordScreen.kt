@@ -1,7 +1,6 @@
 package com.example.app02.ui.Screens
 
 
-import android.widget.Toast
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -24,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Numbers
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,6 +60,7 @@ import com.example.app02.network.api.ResetPasswordRequest
 import com.example.app02.ui.components.BoldTextComponent
 import com.example.app02.ui.components.Btn
 import com.example.app02.ui.components.ClickableLoginTextComponent
+import com.example.app02.ui.components.CommonAlertDialog
 import com.example.app02.ui.components.MyTextField
 import com.example.app02.ui.components.MyTextFieldPassword
 import com.example.app02.ui.components.NormalTextComponent
@@ -68,6 +70,7 @@ import com.example.app02.ui.theme.red
 import com.example.app02.viewmodel.LoginState
 import com.example.app02.viewmodel.LoginViewModel
 import com.example.app02.viewmodel.UserViewModel
+import com.example.app02.models.DialogData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -81,7 +84,7 @@ fun ResetPasswordScreen(
     userViewModel: UserViewModel = viewModel()
 ) {
     var email by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
+    var dialogData by remember { mutableStateOf<DialogData?>(null) }
     var otp by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -153,7 +156,14 @@ fun ResetPasswordScreen(
                 value = "Gửi mã OTP",
                 onClick = {
                     userViewModel.forgotPassword(email) { success ->
-                        note = "Mã OTP đã được gửi về email"
+                        dialogData = DialogData(
+                            title = if (success) "Đã gửi mã xác thực" else "Không thể gửi mã xác thực",
+                            message = if (success) "Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư và nhập mã để tiếp tục." else "Không tìm thấy email hoặc không thể gửi mã OTP. Vui lòng kiểm tra lại thông tin.",
+                            dismissText = null,
+                            icon = if (success) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                            onConfirm = { dialogData = null },
+                            onDismiss = { dialogData = null }
+                        )
                     }
                 }
             )
@@ -168,9 +178,26 @@ fun ResetPasswordScreen(
                         val dto = ResetPasswordRequest(email, otp, password)
                         userViewModel.resetPassword(dto) { success ->
                             if (success) {
-                                note = "Đặt lại mật khẩu thành công"
-                                Toast.makeText(context, "Đặt lại mật khẩu thành công", Toast.LENGTH_SHORT).show()
-                                navController.navigate(Screen.Login.route)
+                                dialogData = DialogData(
+                                    title = "Đặt lại mật khẩu thành công",
+                                    message = "Mật khẩu mới đã được cập nhật. Bạn có thể đăng nhập bằng mật khẩu mới.",
+                                    dismissText = null,
+                                    icon = Icons.Default.CheckCircle,
+                                    onConfirm = {
+                                        dialogData = null
+                                        navController.navigate(Screen.Login.route)
+                                    },
+                                    onDismiss = { dialogData = null }
+                                )
+                            } else {
+                                dialogData = DialogData(
+                                    title = "Không thể đặt lại mật khẩu",
+                                    message = "Mã OTP hoặc thông tin tài khoản chưa chính xác. Vui lòng kiểm tra và thử lại.",
+                                    dismissText = null,
+                                    icon = Icons.Default.ErrorOutline,
+                                    onConfirm = { dialogData = null },
+                                    onDismiss = { dialogData = null }
+                                )
                             }
                         }
                     }
@@ -178,12 +205,11 @@ fun ResetPasswordScreen(
             }
 
 
-            Text(note, modifier = Modifier, style = TextStyle(Color.Green))
-
             Spacer(modifier = Modifier.height(16.dp))
 
 
         }
+        dialogData?.let { CommonAlertDialog(it) }
 
 
     }

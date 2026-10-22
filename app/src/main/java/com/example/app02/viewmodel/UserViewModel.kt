@@ -8,7 +8,7 @@ import com.example.app02.data.DataStore
 import com.example.app02.network.api.ForgotPasswordRequest
 import com.example.app02.network.api.ResetPasswordRequest
 import com.example.app02.network.api.RetrofitInstance
-import com.example.app02.network.models.User
+import com.example.app02.models.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch

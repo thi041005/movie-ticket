@@ -1,167 +1,232 @@
 package com.example.app02.viewmodel
 
-import android.util.Log
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.app02.network.api.MovieSearch
 import com.example.app02.network.api.MovieUpdateDTO
-import com.example.app02.network.api.RetrofitInstance
-import com.example.app02.network.models.Movie
-import com.google.gson.Gson
+import com.example.app02.models.Movie
+import com.example.app02.repositories.MovieRepository
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.http.Query
+import kotlin.collections.emptyList
 
-class MovieViewModel : ViewModel() {
-    private val _movies = MutableStateFlow<List<Movie>>(emptyList())
-    val movies = _movies.asStateFlow()
+// State cho danh sách phim & màn hình chính
+data class MovieUiState(
+    val isLoading: Boolean = false,
+    val movies: List<Movie> = emptyList(),
+    val selectedMovie: Movie? = null,
+    val userMessage: String? = null, // Dùng để hiển thị thông báo trong dialog
+    val errorMessage: String? = null
+)
 
+@OptIn(FlowPreview::class)
+class MovieViewModel(
+    private val repository: MovieRepository = MovieRepository()
+) : ViewModel() {
 
-    private val _selectedMovie = MutableStateFlow<Movie?>(null)
-    val selectedMovie = _selectedMovie.asStateFlow()
+    private val _uiState = MutableStateFlow(MovieUiState())
+    val uiState: StateFlow<MovieUiState> = _uiState.asStateFlow()
 
-    private val _filterMovies = MutableStateFlow<List<Movie>>(emptyList())
-    val filterMovies = _filterMovies.asStateFlow()
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _delMovie = MutableStateFlow<String>("")
-    val delMovie = _delMovie.asStateFlow()
+    init {
+        fetchMovies()
 
-    var newMovieState = mutableStateOf(NewMovieState())
-
-    private val _query = MutableStateFlow("")
-    val query: StateFlow<String> = _query
-
-//    init {
-//        viewModelScope.launch {
-//            _query
-//                .debounce(300)
-//                .filter { it.isNotBlank() }
-//                .distinctUntilChanged()
-//                .collect { key ->
-//                    _resultSearch.value = search(key)
-//                }
-//        }
-//    }
-
-    fun fetchMovies() {
+        // Kích hoạt debounce search tự động
         viewModelScope.launch {
-            try {
-                val response = RetrofitInstance.apiService.getMovies()
-                _movies.value = response
-            } catch (e: Exception) {
-                println("Lỗi khi lấy danh sách phim: ${e.message}")
+            _searchQuery.debounce(300).distinctUntilChanged().collect { query ->
+                if (query.isBlank()) {
+                    fetchMovies()
+                } else {
+                    search(query)
+                }
             }
         }
     }
 
-    fun fetchMoviesByCate(id: Int) {
+    fun onSearchQueryChanged(newQuery: String) {
+        _searchQuery.value = newQuery
+    }
+
+    fun fetchMovies() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
-                val response = RetrofitInstance.apiService.getMovieByCate(id)
-                _movies.value = response ?: emptyList()
+                val response = repository.getMovies()
+                _uiState.update { it.copy(isLoading = false, movies = response) }
             } catch (e: Exception) {
-                println("Lỗi khi lấy phim theo danh mục: ${e.message}")
+                _uiState.update {
+                    it.copy(
+                        isLoading = false, errorMessage = "Lỗi khi tải danh sách: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun fetchMoviesByCate(categoryId: Int) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                val response = repository.getMoviesByCate(categoryId)
+                _uiState.update { it.copy(isLoading = false, movies = response) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false, errorMessage = "Lỗi khi lọc phim: ${e.message}"
+                    )
+                }
             }
         }
     }
 
     fun fetchMovieDetails(id: Int) {
         viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    selectedMovie = null,
+                    errorMessage = null
+                )
+            }
             try {
-                val response = RetrofitInstance.apiService.getMovieById(id)
-                _selectedMovie.value = response
+                val response = repository.getMovieById(id)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        selectedMovie = response
+                    )
+                }
             } catch (e: Exception) {
-                println("Lỗi khi lấy chi tiết phim: ${e.message}")
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Lỗi tải chi tiết phim: ${e.message}"
+                    )
+                }
             }
         }
     }
 
-    fun deleteMov(id: Int, onResult: (Boolean) -> Unit) {
+    fun deleteMovie(id: Int) {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
             try {
-                val response = RetrofitInstance.apiService.deleteMovie(id)
+                val response = repository.deleteMovie(id)
                 if (response.isSuccessful) {
                     val msg = response.body()?.string() ?: "Xóa phim thành công"
-                    _delMovie.value = msg
-                    onResult(true)
+                    // Xóa item thành công -> Cập nhật lại list trong UI State mà không cần gọi lại API
+                    _uiState.update { state ->
+                        state.copy(
+                            isLoading = false,
+                            movies = state.movies.filterNot { it.id == id },
+                            userMessage = msg
+                        )
+                    }
                 } else {
-                    val msg = response.errorBody()?.string() ?: "Xóa phim không thành công"
-                    _delMovie.value = msg
-                    onResult(false)
+                    val errorMsg = response.errorBody()?.string() ?: "Xóa phim thất bại"
+                    _uiState.update { it.copy(isLoading = false, errorMessage = errorMsg) }
                 }
             } catch (e: Exception) {
-                _delMovie.value = "Xóa phim không thành công "
-                onResult(false)
-                throw Exception(e.message)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false, errorMessage = "Lỗi mạng khi xóa: ${e.message}"
+                    )
+                }
             }
         }
     }
 
-    fun update(id: Int, updateMovie: MovieUpdateDTO, onResult: (Boolean) -> Unit) {
+    fun updateMovie(id: Int, updateDTO: MovieUpdateDTO) {
         viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                )
+            }
             try {
-                val response = RetrofitInstance.apiService.updateMovie(id, updateMovie)
+                val response = repository.updateMovie(id, updateDTO)
                 if (response.isSuccessful) {
-                    val msg = response.body()?.string() ?: "Cập nhật phim thành công"
-                    _delMovie.value = msg
-                    onResult(true)
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false, userMessage = response.body()?.string()
+                                ?: "Cập nhật phim thành công"
+                        )
+                    }
+                    fetchMovieDetails(id)
+
+                    fetchMovies() // Refresh danh sách sau khi update
                 } else {
-                    val msg = response.errorBody()?.string() ?: "Cập nhật phim không thành công"
-                    _delMovie.value = msg
-                    onResult(false)
+                    val errorMsg = response.errorBody()?.string()
+                        ?: "Cập nhật phim thất bại (HTTP \${response.code()})"
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = errorMsg
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                _delMovie.value = "Cập nhật phim không thành công "
-                onResult(false)
-                throw Exception(e.message)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false, errorMessage = "Lỗi mạng khi cập nhật: ${e.message}"
+                    )
+                }
             }
         }
     }
 
-    fun newMovie(movie: Movie, onResult: (Boolean) -> Unit) {
-        newMovieState.value = NewMovieState(isLoading = true)
+    fun createMovie(movie: Movie) {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
             try {
-                val response = RetrofitInstance.apiService.newMovie(movie)
-                Log.d("MovieDebug", "Movie gửi lên: ${Gson().toJson(movie)}")
+                val response = repository.createMovie(movie)
                 if (response.isSuccessful) {
                     val msg = response.body()?.string() ?: "Thêm phim mới thành công"
-                    newMovieState.value = NewMovieState(isLoading = false, msg)
-                    onResult(true)
+                    _uiState.update { it.copy(isLoading = false, userMessage = msg) }
+                    fetchMovies()
                 } else {
-                    val msg = response.errorBody()?.string() ?: "Thêm phim mới thất bại"
-                    newMovieState.value = NewMovieState(
-                        isLoading = false, errorMessage = msg
-                    )
-                    onResult(false)
+                    val errorMsg = response.errorBody()?.string() ?: "Thêm phim mới thất bại"
+                    _uiState.update { it.copy(isLoading = false, errorMessage = errorMsg) }
                 }
             } catch (e: Exception) {
-                newMovieState.value = NewMovieState(isLoading = false, errorMessage = e.message)
-                onResult(false)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false, errorMessage = "Lỗi mạng: ${e.message}"
+                    )
+                }
             }
         }
     }
 
-     fun search(query: String) {
+    fun search(query: String) {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
             try {
-                val response = RetrofitInstance.apiService.searchMovie(query)
-                _movies.value = response ?: emptyList()
+                val response = repository.searchMovie(query) ?: emptyList()
+                _uiState.update { it.copy(isLoading = false, movies = response) }
             } catch (e: Exception) {
-                println("Lỗi khi tìm kiếm phim ${e}")
+                _uiState.update {
+                    it.copy(
+                        isLoading = false, errorMessage = "Lỗi tìm kiếm: ${e.message}"
+                    )
+                }
             }
         }
+    }
+
+    // Hàm gọi từ UI sau khi đã hiển thị dialog để reset thông báo
+    fun userMessageShown() {
+        _uiState.update { it.copy(userMessage = null) }
+    }
+
+    fun errorMessageShown() {
+        _uiState.update { it.copy(errorMessage = null) }
     }
 }
-
-data class NewMovieState(
-    val isLoading: Boolean = false,
-    val message: String? = null,
-    val errorMessage: String? = null
-)

@@ -4,25 +4,21 @@ import com.example.app02.dto.HoldSeatReq
 import com.example.app02.dto.LoginRequest
 import com.example.app02.dto.LoginResponse
 import com.example.app02.dto.SignupRequest
-import com.example.app02.network.models.Cate
-import com.example.app02.network.models.Movie
-import com.example.app02.network.models.Seat
-import com.example.app02.dto.SeatBookingRequest
-import com.example.app02.network.models.Genre
-import com.example.app02.network.models.Showtime
-import com.example.app02.network.models.User
+import com.example.app02.models.Cate
+import com.example.app02.models.Movie
+import com.example.app02.models.Seat
+import com.example.app02.models.Genre
+import com.example.app02.models.Showtime
+import com.example.app02.models.User
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
-import retrofit2.http.Field
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
 
 interface ApiService {
     @POST("auth/login")
@@ -44,7 +40,7 @@ interface ApiService {
     suspend fun getMovieById(@Path("id") id: Int): Movie
 
     @GET("/public/movies/withCate/{id}")
-    suspend fun getMovieByCate(@Path("id") id: Int): List<Movie>
+    suspend fun getMoviesByCate(@Path("id") id: Int): List<Movie>
 
     @GET("/public/movies/search")
     suspend fun searchMovie(@Query("query") query: String): List<Movie>
@@ -101,7 +97,7 @@ interface ApiService {
     ): Response<ResponseBody>
 
     @POST("admin/movie/add")
-    suspend fun newMovie(@Body movie: Movie): Response<ResponseBody>
+    suspend fun createMovie(@Body movie: Movie): Response<ResponseBody>
 
     @GET("user/rate/{id}")
     suspend fun getRate(@Path("id") id: Int): List<RatingResponseDTO>
@@ -118,15 +114,13 @@ interface ApiService {
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body request: ResetPasswordRequest): Response<ResponseBody>
 
-    @POST("public/schedule")
-    suspend fun schedule(@Body time: ScheduleRequest): Response<ResponseBody>
-
     @POST("public/schedule-movie")
     suspend fun scheduleByMovie(@Body req: ScheduleMovieRequest): Response<ResponseBody>
 
     @GET("public/count-seat/{showtimeId}")
     suspend fun countSeat(@Path("showtimeId") showtimeId: Int): Response<Int?>
 }
+
 data class ScheduleRequest(
     val fromDate: String,
     val toDate: String,
@@ -134,6 +128,7 @@ data class ScheduleRequest(
     val dailyEnd: String
 
 )
+
 data class ScheduleMovieRequest(
     val movieId: Int,
     val fromDate: String,
@@ -244,6 +239,7 @@ data class RatingResponseDTO(
 data class ForgotPasswordRequest(
     val email: String
 )
+
 data class ResetPasswordRequest(
     val email: String,
     val otp: String,

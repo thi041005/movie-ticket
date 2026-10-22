@@ -1,6 +1,4 @@
-package com.example.app02.network.models
-
-import java.time.LocalDate
+package com.example.app02.models
 
 data class Movie(
     val id: Int? = null,

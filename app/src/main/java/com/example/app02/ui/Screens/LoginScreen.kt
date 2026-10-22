@@ -1,7 +1,6 @@
 package com.example.app02.ui.Screens
 
 
-import android.widget.Toast
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -20,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +54,7 @@ import com.example.app02.nav.Screen
 import com.example.app02.ui.components.BoldTextComponent
 import com.example.app02.ui.components.Btn
 import com.example.app02.ui.components.ClickableLoginTextComponent
+import com.example.app02.ui.components.CommonAlertDialog
 import com.example.app02.ui.components.MyTextField
 import com.example.app02.ui.components.MyTextFieldPassword
 import com.example.app02.ui.components.NormalTextComponent
@@ -61,6 +63,7 @@ import com.example.app02.ui.theme.bcl
 import com.example.app02.ui.theme.red
 import com.example.app02.viewmodel.LoginState
 import com.example.app02.viewmodel.LoginViewModel
+import com.example.app02.models.DialogData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -74,6 +77,7 @@ fun LoginScreen(navController: NavController, loginViewModel: LoginViewModel = v
     var password = remember { mutableStateOf("") }
     val context = LocalContext.current
     val dataStore = remember { DataStore(context) }
+    var dialogData by remember { mutableStateOf<DialogData?>(null) }
 
     val imageModifier = Modifier
         .size(150.dp)
@@ -162,16 +166,26 @@ fun LoginScreen(navController: NavController, loginViewModel: LoginViewModel = v
                                     }
 
                                     else -> {
-                                        Toast.makeText(
-                                            context,
-                                            "Role không hợp lệ",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        dialogData = DialogData(
+                                            title = "Không thể xác định quyền truy cập",
+                                            message = "Tài khoản chưa được cấp quyền phù hợp. Vui lòng liên hệ quản trị viên.",
+                                            dismissText = null,
+                                            icon = Icons.Default.ErrorOutline,
+                                            onConfirm = { dialogData = null },
+                                            onDismiss = { dialogData = null }
+                                        )
                                     }
                                 }
                             }
                         } else {
-                            Toast.makeText(context, "Đăng nhập thất bại", Toast.LENGTH_SHORT).show()
+                        dialogData = DialogData(
+                            title = "Đăng nhập không thành công",
+                            message = "Email hoặc mật khẩu chưa chính xác. Vui lòng kiểm tra lại thông tin.",
+                            dismissText = null,
+                            icon = Icons.Default.ErrorOutline,
+                            onConfirm = { dialogData = null },
+                            onDismiss = { dialogData = null }
+                        )
                         }
                     }
                 },
@@ -183,14 +197,12 @@ fun LoginScreen(navController: NavController, loginViewModel: LoginViewModel = v
 
             when (loginState) {
                 is LoginState.Loading -> CircularProgressIndicator()
-                is LoginState.Error -> Text(
-                    "${loginState as LoginState.Error}.message",
-                    color = Color.Red
-                )
+                is LoginState.Error -> {}
 
                 else -> {}
             }
 
+    dialogData?.let { CommonAlertDialog(it) }
 
 
 

@@ -1,7 +1,7 @@
 package com.example.app02.nav
 
 sealed class Screen(val route: String) {
-     data object Home : Screen("user_home")
+     data object UserHome : Screen("user_home")
      data object Bill : Screen("bill")
      data object Login : Screen("login")
      data object SignUp : Screen("signup")

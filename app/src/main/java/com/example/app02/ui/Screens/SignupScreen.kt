@@ -16,8 +16,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,6 +45,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.app02.R
 import com.example.app02.ui.components.Btn
 import com.example.app02.ui.components.ClickableLoginTextComponent
+import com.example.app02.ui.components.CommonAlertDialog
 import com.example.app02.ui.components.MyTextField
 import com.example.app02.ui.components.MyTextFieldPassword
 import com.example.app02.ui.components.checkBox
@@ -50,7 +54,7 @@ import com.example.app02.nav.Screen
 import com.example.app02.ui.components.BoldTextComponent
 import com.example.app02.viewmodel.LoginViewModel
 import com.example.app02.viewmodel.SignupViewModel
-import org.json.JSONObject
+import com.example.app02.models.DialogData
 
 
 @Composable
@@ -59,9 +63,32 @@ fun SignupScreen(navController: NavController, signupViewModel: SignupViewModel 
     val password = remember { mutableStateOf("") }
     val phone = remember { mutableStateOf("") }
     val name = remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf("") }
+    var dialogData by remember { mutableStateOf<DialogData?>(null) }
 
     val state by signupViewModel.signupState
+
+    LaunchedEffect(state.message, state.errorMessage) {
+        state.message?.takeIf { it.isNotBlank() }?.let { message ->
+            dialogData = DialogData(
+                title = "Đăng ký thành công",
+                message = message,
+                dismissText = null,
+                icon = Icons.Default.CheckCircle,
+                onConfirm = { dialogData = null },
+                onDismiss = { dialogData = null }
+            )
+        }
+        state.errorMessage?.takeIf { it.isNotBlank() }?.let { error ->
+            dialogData = DialogData(
+                title = "Không thể tạo tài khoản",
+                message = error,
+                dismissText = null,
+                icon = Icons.Default.ErrorOutline,
+                onConfirm = { dialogData = null },
+                onDismiss = { dialogData = null }
+            )
+        }
+    }
 
 
     Surface(
@@ -120,9 +147,15 @@ fun SignupScreen(navController: NavController, signupViewModel: SignupViewModel 
                 value = "Đăng ký",
                 onClick = {
                     if (email.value.isBlank() || password.value.isBlank()) {
-                        errorMessage = "Vui lòng nhập đầy đủ thông tin!"
+                        dialogData = DialogData(
+                            title = "Thiếu thông tin đăng ký",
+                            message = "Vui lòng nhập họ tên, email, số điện thoại và mật khẩu để tiếp tục.",
+                            dismissText = null,
+                            icon = Icons.Default.ErrorOutline,
+                            onConfirm = { dialogData = null },
+                            onDismiss = { dialogData = null }
+                        )
                     } else {
-                        errorMessage = ""
                         signupViewModel.signup(name.value, email.value, phone.value, password.value)
                     }
                 }
@@ -131,46 +164,6 @@ fun SignupScreen(navController: NavController, signupViewModel: SignupViewModel 
             )
             if (state.isLoading) {
                 CircularProgressIndicator()
-            }
-            if (errorMessage.isNotEmpty()) {
-                Text(
-                    text = errorMessage,
-                    color = Color.Red,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-            val errorText = state.errorMessage?.let {
-                try {
-                    JSONObject(it).getString("message") // Lấy nội dung từ key "message"
-                } catch (e: Exception) {
-                    it // Nếu có lỗi, giữ nguyên nội dung
-                }
-            }
-
-            state.message?.let { msg ->
-                Text(
-                    text = msg,
-                    color = Color.Green,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-
-            state.errorMessage?.let { error ->
-                Text(
-                    text = error,
-                    color = Color.Red,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-
-            if (!state.isLoading) {
-                errorText?.takeIf { it.isNotBlank() }?.let {
-                    Text(
-                        text = it,
-                        color = Color.Red,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
-                }
             }
             lineDivide()
             ClickableLoginTextComponent("Bạn đã có tài khoản?", "Đăng nhập", onTextSelected = {
@@ -181,6 +174,7 @@ fun SignupScreen(navController: NavController, signupViewModel: SignupViewModel 
 
 
     }
+    dialogData?.let { CommonAlertDialog(it) }
 
 }
 @Preview(showBackground = true)
